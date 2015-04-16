@@ -36,7 +36,9 @@ def init(name='', level=logging.WARN, syslog=True, console=True):
         lg.addHandler(lg_console)
 
     if syslog:
-        lg_syslog = logging.handlers.SysLogHandler(address='/dev/log')
+        lg_syslog = logging.handlers.SysLogHandler(
+            facility=logging.handlers.SysLogHandler.LOG_LOCAL5,
+            address='/dev/log')
         lg_syslog.setFormatter(logging.Formatter('%(name)-9s %(levelname)-8s %(message)s'))
 
         lg.addHandler(lg_syslog)

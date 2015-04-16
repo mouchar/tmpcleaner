@@ -69,15 +69,16 @@ def main():
     parser = argparse.ArgumentParser(description='Smart temp cleaner')
     parser.add_argument('config', help='Config file to use')
     parser.add_argument('--dry', action='store_true', help='Dry run only')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Be verbose')
-    parser.add_argument('-d', '--debug', action='store_true', help='Debug mode')
-    parser.add_argument('-q', '--quiet', action='store_true', help='Be quiet (no console logging)')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='Be verbose')
+    parser.add_argument('-d', '--debug', action='store_true',
+                        help='Debug mode')
+    parser.add_argument('-q', '--quiet', action='store_true', default=False,
+                        help='Be quiet (no console logging)')
     args = parser.parse_args()
 
-    if args.quiet:
-        lg = tmpcleaner.logger.init(console=False)
-    else:
-        lg = tmpcleaner.logger.init()
+    logging_args = {'console': not args.quiet}
+    lg = tmpcleaner.logger.init(**logging_args)
 
     if args.verbose:
         lg.setLevel(logging.INFO)
@@ -111,7 +112,12 @@ def main():
         if name is None:
             name = 'unspecified'
 
-        report = 'Summary: path={0} definition={1} removed_files={removed[files]} removed_dirs={removed[dirs]} removed_size={removed[size]} existing_files={existing[files]} existing_dirs={existing[dirs]} existing_size={existing[size]}'.format(cleaner.config['path'], name, **definition)
+        report = (
+            'Summary: path={0} definition={1} removed_files={removed[files]} '
+            'removed_dirs={removed[dirs]} removed_size={removed[size]} '
+            'existing_files={existing[files]} existing_dirs={existing[dirs]} '
+            'existing_size={existing[size]}'.format(cleaner.config['path'],
+                                                    name, **definition))
         totals['removed_files'] += definition['removed']['files']
         totals['removed_dirs'] += definition['removed']['dirs']
         totals['removed_size'] += definition['removed']['size']
@@ -121,8 +127,14 @@ def main():
         lg.warn(report)
 
     # Print totals
-    report = 'Summary totals: path={0} time={1} time_pass={2} time_remove={3} removed_files={removed_files} removed_dirs={removed_dirs} removed_size={removed_size} existing_files={existing_files} existing_dirs={existing_dirs} existing_size={existing_size}' \
-        .format(cleaner.config['path'], cleaner.time_run.seconds, cleaner.time_pass.seconds, cleaner.time_remove.seconds, **totals)
+    report_fmt = (
+        'Summary totals: path={0} time={1} time_pass={2} time_remove={3} '
+        'removed_files={removed_files} removed_dirs={removed_dirs} '
+        'removed_size={removed_size} existing_files={existing_files} '
+        'existing_dirs={existing_dirs} existing_size={existing_size}')
+    report = report_fmt.format(
+        cleaner.config['path'], cleaner.time_run.seconds,
+        cleaner.time_pass.seconds, cleaner.time_remove.seconds, **totals)
     lg.warn(report)
 
 if __name__ == '__main__':
