@@ -121,8 +121,8 @@ def main():
         lg.warn(report)
 
     # Print totals
-    report = 'Summary totals: path={0} time={1} removed_files={removed_files} removed_dirs={removed_dirs} removed_size={removed_size} existing_files={existing_files} existing_dirs={existing_dirs} existing_size={existing_size}'\
-        .format(cleaner.config['path'], cleaner.time_run.seconds, **totals)
+    report = 'Summary totals: path={0} time={1} time_pass={2} time_remove={3} removed_files={removed_files} removed_dirs={removed_dirs} removed_size={removed_size} existing_files={existing_files} existing_dirs={existing_dirs} existing_size={existing_size}' \
+        .format(cleaner.config['path'], cleaner.time_run.seconds, cleaner.time_pass.seconds, cleaner.time_remove.seconds, **totals)
     lg.warn(report)
 
 if __name__ == '__main__':

@@ -38,6 +38,8 @@ class TmpCleaner(object):
         self.files = []
 
         self.time_run = timedelta(seconds=0)
+        self.time_pass = timedelta(seconds=0)
+        self.time_remove = timedelta(seconds=0)
 
         if self.dry:
             lg.info("Running in dry-run mode")
@@ -59,17 +61,17 @@ class TmpCleaner(object):
         # Setup summary structure
         self.summary = {
             None: {
-                'failed': {'dirs': 0, 'files': 0},
-                'removed': {'dirs': 0, 'files': 0},
-                'existing': {'dirs': 0, 'files': 0},
+                'failed': {'dirs': 0, 'files': 0, 'size': 0},
+                'removed': {'dirs': 0, 'files': 0, 'size': 0},
+                'existing': {'dirs': 0, 'files': 0, 'size': 0},
             }
         }
 
         for definition in self.definitions:
             self.summary[definition.name] = {
-                'failed': {'dirs': 0, 'files': 0},
-                'removed': {'dirs': 0, 'files': 0},
-                'existing': {'dirs': 0, 'files': 0},
+                'failed': {'dirs': 0, 'files': 0, 'size': 0},
+                'removed': {'dirs': 0, 'files': 0, 'size': 0},
+                'existing': {'dirs': 0, 'files': 0, 'size': 0},
             }
 
         # Compile regexp for excluded paths
@@ -262,6 +264,10 @@ class TmpCleaner(object):
             status = 'existing'
 
         self.summary[f_object.definition][status][category] += 1
+
+        # Update size statistics
+        if not f_object.directory and f_object.stat.st_size:
+            self.summary[f_object.definition][status]['size'] += f_object.stat.st_size
 
     def get_summary(self):
         """
