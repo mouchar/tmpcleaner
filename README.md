@@ -18,7 +18,7 @@ Or directly from Github:
 
 Or from local GIT checkout:
 
-	python setup.py install
+	make install
 
 Then you can run it by tmpcleaner.py script that is installed within package.
 

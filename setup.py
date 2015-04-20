@@ -19,27 +19,6 @@ class PyTest(TestCommand):
         errno = pytest.main(self.test_args)
         sys.exit(errno)
 
-# Get current branch
-branch = os.getenv('GIT_BRANCH')
-if not branch:
-    branch = os.popen('git branch|grep -v "no branch"|grep \*|sed s,\*\ ,,g').read().rstrip()
-
-    if not branch:
-        branch = 'master'
-else:
-    branch = branch.replace('origin/', '')
-
-# Get git revision hash
-revision = os.popen('git rev-parse --short HEAD').read().rstrip()
-
-if not revision:
-    revision = '0'
-
-# Get build number
-build = os.getenv('BUILD_NUMBER')
-if not build:
-    build = '1'
-
 # Parameters for build
 params = {
     'name': 'tmpcleaner',
@@ -110,11 +89,5 @@ if action == 'clean':
                 pass
             else:
                 raise
-elif action == 'bdist_rpm':
-    # Set release number
-    sys.argv.append('--release=1.%s.%s' % (build, revision))
-    # Require same version of gdc-python-common package
-    sys.argv.append('--requires=PyYAML python-argparse python-dateutil')
-    setup(**params)
 else:
     setup(**params)
