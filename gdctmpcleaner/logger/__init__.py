@@ -18,7 +18,7 @@ lg = logging.getLogger('application')
 
 import logging
 import logging.handlers
-from tmpcleaner.logger.level_handler import LevelHandler
+from gdctmpcleaner.logger.level_handler import LevelHandler
 
 lg = None
 

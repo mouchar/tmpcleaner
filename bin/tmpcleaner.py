@@ -54,9 +54,9 @@ import sys
 import argparse
 
 import logging
-import tmpcleaner.logger
+import gdctmpcleaner.logger
 
-from tmpcleaner import TmpCleaner, InvalidConfiguration, PIDExists, NoConfigFile
+from gdctmpcleaner import TmpCleaner, InvalidConfiguration, PIDExists, NoConfigFile
 
 global lg
 
@@ -78,7 +78,7 @@ def main():
     args = parser.parse_args()
 
     logging_args = {'console': not args.quiet}
-    lg = tmpcleaner.logger.init(**logging_args)
+    lg = gdctmpcleaner.logger.init(**logging_args)
 
     if args.verbose:
         lg.setLevel(logging.INFO)

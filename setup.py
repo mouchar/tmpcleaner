@@ -24,8 +24,8 @@ params = {
     'name': 'tmpcleaner',
     'version': '1.0',
     'packages': [
-        'tmpcleaner',
-        'tmpcleaner.logger'
+        'gdctmpcleaner',
+        'gdctmpcleaner.logger'
         ],
     'scripts': [
         'bin/tmpcleaner.py',

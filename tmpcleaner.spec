@@ -34,5 +34,5 @@ python setup.py build
 %files
 %defattr(-,root,root,-)
 %{python_sitelib}/*.egg-info
-%{python_sitelib}/tmpcleaner
+%{python_sitelib}/gdctmpcleaner
 /usr/bin/tmpcleaner.py
