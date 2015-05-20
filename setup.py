@@ -24,8 +24,8 @@ params = {
     'name': 'tmpcleaner',
     'version': '1.0',
     'packages': [
-        'tmpcleaner',
-        'tmpcleaner.logger'
+        'gdctmpcleaner',
+        'gdctmpcleaner.logger'
         ],
     'scripts': [
         'bin/tmpcleaner.py',
@@ -35,27 +35,27 @@ params = {
     'license': 'BSD',
     'author': 'GoodData Corporation',
     'author_email': 'python@gooddata.com',
-    'maintainer' : 'Filip Pytloun',
-    'maintainer_email' : 'filip@pytloun.cz',
+    'maintainer': 'Filip Pytloun',
+    'maintainer_email': 'filip@pytloun.cz',
     'description': 'Smart Temp Cleaner',
     'long_description': '''Tmpcleaner is simply advanced temp cleaner with statistical capabilities.
 It passes given structure only once, groups directories/files by given definition, applies different cleanup rules by each group and print final statistics.''',
-    'tests_require' : ['pytest'],
-    'cmdclass' : {'test': PyTest},
+    'tests_require': ['pytest'],
+    'cmdclass': {'test': PyTest},
     'requires': ['yaml', 'argparse'],
-    'classifiers' : [
-        'Development Status :: 5 - Production/Stable',
-        'Environment :: Console',
-        'Intended Audience :: Developers',
-        'Intended Audience :: System Administrators',
-        'License :: OSI Approved :: BSD License',
-        'Natural Language :: English',
-        'Operating System :: POSIX',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: Implementation :: CPython',
-        'Topic :: System :: Monitoring',
+    'classifiers': [
+        'Development Status:: 5 - Production/Stable',
+        'Environment:: Console',
+        'Intended Audience:: Developers',
+        'Intended Audience:: System Administrators',
+        'License:: OSI Approved:: BSD License',
+        'Natural Language:: English',
+        'Operating System:: POSIX',
+        'Programming Language:: Python',
+        'Programming Language:: Python:: Implementation:: CPython',
+        'Topic:: System:: Monitoring',
     ],
-    'platforms' : ['POSIX'],
+    'platforms': ['POSIX'],
 }
 
 setup(**params)
