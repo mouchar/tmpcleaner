@@ -11,6 +11,7 @@ Vendor:		GoodData Corporation <root@gooddata.com>
 Requires:	PyYAML python-argparse python-dateutil
 BuildRequires:	python2-devel python-setuptools-devel python-argparse PyYAML
 Url:		https://github.com/gooddata/tmpcleaner
+Obsoletes:	gdc-python-tools < 2
 
 %description
 Tmpcleaner is simply advanced temp cleaner with statistical capabilities.
