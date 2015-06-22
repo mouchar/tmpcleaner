@@ -78,7 +78,7 @@ def main():
     args = parser.parse_args()
 
     logging_args = {'console': not args.quiet}
-    lg = gdctmpcleaner.logger.init(**logging_args)
+    lg = gdctmpcleaner.logger.init(name='tmpcleaner', **logging_args)
 
     if args.verbose:
         lg.setLevel(logging.INFO)
