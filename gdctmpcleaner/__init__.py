@@ -18,7 +18,7 @@ import re
 from datetime import datetime, timedelta
 
 import logging
-lg = logging.getLogger(__name__)
+lg = logging.getLogger('tmpcleaner')
 
 
 class TmpCleaner(object):
