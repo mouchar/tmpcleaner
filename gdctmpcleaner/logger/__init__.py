@@ -26,6 +26,7 @@ lg = None
 def init(name='', level=logging.WARN, syslog=True, console=True):
     global lg
 
+    logging.basicConfig()
     lg = logging.getLogger(name)
     lg.setLevel(level)
 
