@@ -12,6 +12,7 @@ import stat
 import posix
 
 from itertools import count
+from shutil import rmtree
 
 import yaml
 import re
@@ -98,14 +99,13 @@ class TmpCleaner(object):
         if self.pidfile:
             os.unlink(self.pidfile)
 
-    def walk_tree(self, path, topdown=True):
+    def walk_dir(self, path):
         """
-        Walk directory tree, similar to os.walk() but return File objects
+        Delete files matching criteria and return list of subdirs
 
         :param path: File object or string path
-        :param topdown: pass from top down or from bottom to top
-        :returns: 3-tuple like (File(root), [File(dir)], [File(file)])
-        :rtype: tuple
+        :returns: list of subdirs
+        :rtype: list
         """
         if isinstance(path, File):
             # Called with File object as an argument
@@ -114,7 +114,7 @@ class TmpCleaner(object):
         else:
             root = File(path)
 
-        files, dirs = [], []
+        dirs = []
 
         try:
             for item in os.listdir(path):
@@ -145,10 +145,9 @@ class TmpCleaner(object):
                         lg.exception(e)
                         continue
 
-                if f_object.directory is True:
+                entry = self.match_delete(f_object)
+                if f_object.directory and not entry.removed:
                     dirs.append(f_object)
-                else:
-                    files.append(f_object)
         except OSError as e:
             # Exceptions that may come from os.listdir()
             if e.errno == errno.ENOENT:
@@ -164,15 +163,7 @@ class TmpCleaner(object):
                 lg.exception(e)
                 pass
 
-        if topdown:
-            yield root, dirs, files
-
-        for item in dirs:
-            for x in self.walk_tree(item):
-                yield x
-
-        if not topdown:
-            yield root, dirs, files
+        return dirs
 
     def run(self):
         """
@@ -182,19 +173,11 @@ class TmpCleaner(object):
         lg.warn("Passing %s" % self.config['path'])
         time_start = datetime.now()
 
-        buffer_dirs = []
-        for root, dirs, files in self.walk_tree(self.config['path'], topdown=True):
-            for f_object in files:
-                # Remove files immediately
-                self.match_delete(f_object)
-
-            for f_object in dirs:
-                # Dirs have to be removed at last
-                buffer_dirs.append(f_object)
-
-        # Remove directories
-        for f_object in buffer_dirs:
-            self.match_delete(f_object)
+        buffer_dirs = self.walk_dir(self.config['path'])
+        while buffer_dirs:
+            for subdir in buffer_dirs:
+                buffer_dirs += self.walk_dir(subdir)
+                buffer_dirs.remove(subdir)
 
         self.time_run = datetime.now() - time_start
 
@@ -311,7 +294,7 @@ class File(object):
         Remove file or directory
         """
         if self.directory:
-            os.rmdir(self.path)
+            rmtree(self.path)
         else:
             os.unlink(self.path)
 
