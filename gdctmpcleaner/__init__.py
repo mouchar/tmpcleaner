@@ -175,9 +175,8 @@ class TmpCleaner(object):
 
         buffer_dirs = self.walk_dir(self.config['path'])
         while buffer_dirs:
-            for subdir in buffer_dirs:
-                buffer_dirs += self.walk_dir(subdir)
-                buffer_dirs.remove(subdir)
+            subdir = buffer_dirs.pop(0)
+            buffer_dirs += self.walk_dir(subdir)
 
         self.time_run = datetime.now() - time_start
 
