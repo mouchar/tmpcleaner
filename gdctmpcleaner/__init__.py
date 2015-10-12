@@ -12,7 +12,6 @@ import stat
 import posix
 
 from itertools import count
-from shutil import rmtree
 
 import yaml
 import re
@@ -145,9 +144,9 @@ class TmpCleaner(object):
                         lg.exception(e)
                         continue
 
-                entry = self.match_delete(f_object)
-                if f_object.directory and not entry.removed:
-                    dirs.append(f_object)
+                self.match_delete(f_object)
+                if f_object.directory and not f_object.removed:
+                    dirs.append(file_path)
         except OSError as e:
             # Exceptions that may come from os.listdir()
             if e.errno == errno.ENOENT:
@@ -163,6 +162,10 @@ class TmpCleaner(object):
                 lg.exception(e)
                 pass
 
+        # This directory should be deleted after it's children are
+        if self.match(root):
+            parent, _ = os.path.split(path)
+            dirs.append(parent)
         return dirs
 
     def run(self):
@@ -180,49 +183,69 @@ class TmpCleaner(object):
 
         self.time_run = datetime.now() - time_start
 
+    def match(self, file):
+        """
+        Matches at least one definition?
+
+        :param file: instance of File class
+        :return: True/False
+        """
+        for definition in self.definitions:
+            # Check if file matches definition path (or path is not specified)
+            if definition.match_path(file):
+                # Check if file matches time (return True if we don't want to
+                # match time)
+                if definition.match_time(file):
+                    if definition.no_remove is False:
+                        ftype = 'directory' if file.directory else 'file'
+                        lg.info("Removing %s %s, matching definition %s",
+                                ftype, file.path, definition.name)
+                        return True
+                    else:
+                        lg.debug("File %s matches definition %s, but we don't "
+                                 "want to remove it", file.path,
+                                 definition.name)
+                else:
+                    lg.debug("File %s matches path definition %s but haven't "
+                             "passed time match", file.path, definition.name)
+                # Break if we have found correct definition by path and if
+                # pathMatch was specified
+                #   - to avoid deleting file by more common definition
+                #   - it would be good to have an option to overwrite this
+                #     behavior if requested
+                # also break if we have already removed the file by time
+                if definition.path_match or file.removed:
+                    break
+
+        return False
+
     def match_delete(self, file):
         """
         Remove file if it matches at least one definition
 
         :param file: instance of File class
         """
-        for definition in self.definitions:
-            # Check if file matches definition path (or path is not specified)
-            if definition.match_path(file):
-                # Check if file matches time (return True if we don't want to match time)
-                if definition.match_time(file):
-                    if definition.no_remove is False:
-                        ftype = 'directory' if file.directory is True else 'file'
-                        lg.info("Removing %s %s, matching definition %s" % (ftype, file.path, definition.name))
-                        if not self.dry:
-                            try:
-                                file.remove()
-                            except OSError as e:
-                                # Directory not empty or file or directory doesn't exist, these errors are fine
-                                # just log them and go on
-                                if e.errno in [errno.ENOENT, errno.ENOTEMPTY]:
-                                    lg.info(e)
-                                elif e.errno in [errno.EPERM, errno.EACCES]:
-                                    # Permission denied or operation not supported, log error but go on
-                                    file.failed = True
-                                    lg.error(e)
-                                else:
-                                    # This could be worse error, raise
-                                    raise
-                        else:
-                            # Set removed flag manually in dry-run
-                            file.removed = True
-                        break
+
+        if self.match(file):
+            if not self.dry:
+                try:
+                    file.remove()
+                except OSError as e:
+                    # Directory not empty or file or directory doesn't exist,
+                    # these errors are fine just log them and go on
+                    if e.errno in [errno.ENOENT, errno.ENOTEMPTY]:
+                        lg.info(e)
+                    elif e.errno in [errno.EPERM, errno.EACCES]:
+                        # Permission denied or operation not supported,
+                        # log error but go on
+                        file.failed = True
+                        lg.error(e)
                     else:
-                        lg.debug("File %s matches definition %s, but we don't want to remove it" % (file.path, definition.name))
-                else:
-                    lg.debug("File %s matches path definition %s but haven't passed time match" % (file.path, definition.name))
-                # Break if we have found correct definition by path and if pathMatch was specified
-                #   - to avoid deleting file by more common definition
-                #   - it would be good to have an option to overwrite this behavior if requested
-                # also break if we have already removed the file by time
-                if definition.path_match or file.removed:
-                    break
+                        # This could be worse error, raise
+                        raise
+            else:
+                # Set removed flag manually in dry-run
+                file.removed = True
 
         self.update_summary(file)
         return file
@@ -293,7 +316,7 @@ class File(object):
         Remove file or directory
         """
         if self.directory:
-            rmtree(self.path)
+            os.rmdir(self.path)
         else:
             os.unlink(self.path)
 
