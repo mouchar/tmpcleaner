@@ -12,6 +12,9 @@ tmpcleaner.tar.gz: clean
 build install:
 	python setup.py $@
 
+test:
+	PYTHONPATH=${PYTHONPATH}:/build/rpm/BUILDROOT/tmpcleaner-${VERSION}-1.el6.x86_64$(rpm --eval '%{python_sitelib}') python setup.py $@
+
 rpm: tmpcleaner.tar.gz
 	# Prepare directories and source for rpmbuild
 	mkdir -p build/rpm/SOURCES
