@@ -111,7 +111,7 @@ class TestE2E(unittest.TestCase):
         """
 
         config = '''---
-pidfile: '/var/run/tmpcleaner-execution-log.pid'
+pidfile: 'tmpcleaner-execution-log.pid'
 path: '%s'
 
 definitions:
