@@ -1,5 +1,5 @@
 Name:		tmpcleaner
-Version:	1.0.6
+Version:	1.0.7
 Release:	1%{?dist}
 Source0:	tmpcleaner.tar.gz
 License:	BSD
@@ -22,8 +22,11 @@ statistics.
 %prep
 %setup -q -n tmpcleaner
 
+%check
+make test
+
 %build
-python setup.py build
+make build
 
 %install
 %{__rm} -rf %{buildroot}
