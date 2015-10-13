@@ -114,6 +114,7 @@ class TmpCleaner(object):
             root = File(path)
 
         dirs = []
+        deleted_a_kid = False
 
         try:
             for item in os.listdir(path):
@@ -145,8 +146,11 @@ class TmpCleaner(object):
                         continue
 
                 self.match_delete(f_object)
-                if f_object.directory and not f_object.removed:
-                    dirs.append(file_path)
+                if f_object.removed:
+                    deleted_a_kid = True
+                else:
+                    if f_object.directory:
+                        dirs.append(file_path)
         except OSError as e:
             # Exceptions that may come from os.listdir()
             if e.errno == errno.ENOENT:
@@ -163,7 +167,7 @@ class TmpCleaner(object):
                 pass
 
         # This directory should be deleted after it's children are
-        if self.match(root):
+        if self.match(root) and deleted_a_kid:
             parent, _ = os.path.split(path)
             dirs.append(parent)
         return dirs

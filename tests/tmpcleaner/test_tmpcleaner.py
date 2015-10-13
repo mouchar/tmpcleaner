@@ -7,6 +7,7 @@ import posix
 import tempfile
 import datetime
 import os
+import stat
 import gdctmpcleaner
 
 class TestTmpcleaner(unittest.TestCase):
@@ -101,6 +102,71 @@ class TestTmpcleaner(unittest.TestCase):
         self.assert_(definition.match_time(
             gdctmpcleaner.File('%s/1/3' % self.temp)) is False,
             "File %s matched mtime, but it shouldn't" % self.temp)
+
+
+class TestE2E(unittest.TestCase):
+    def setUp(self):
+        """
+        Prepare testing directory structure
+        """
+
+        config = '''---
+pidfile: '/var/run/tmpcleaner-execution-log.pid'
+path: '%s'
+
+definitions:
+    -
+        name: 'test-def'
+        pathMatch: '%s/.*'
+        mtime: 1
+
+'''
+        self.temp = tempfile.mkdtemp()
+        for i in range(1, 20):
+            os.mkdir('%s/%s' % (self.temp, i))
+            for f in range(1, 5):
+                with open('%s/%s/%s' % (self.temp, i, f), 'w') as fh:
+                    fh.write(str(f))
+
+        self.config = tempfile.mktemp()
+        parent, _ = os.path.split(self.temp)
+        with open(self.config, 'a') as fh:
+            fh.write(config % (parent, self.temp))
+
+    def tearDown(self):
+        """
+        Cleanup testing directory structure
+        """
+        for root, dirs, files in os.walk(self.temp, topdown=False):
+            for f in files:
+                os.unlink(os.path.join(root, f))
+
+            for d in dirs:
+                os.rmdir(os.path.join(root, d))
+
+        os.unlink(self.config)
+
+    def _age(self, path, days):
+        """
+        Change file(dir)'s mtime to past
+        """
+        st = os.stat(path)
+        atime = st[stat.ST_ATIME]
+        mtime = st[stat.ST_MTIME]
+        new_mtime = mtime - 3600*days
+        os.utime(path, (atime, new_mtime))
+
+    def test_old_dir(self):
+        cleaner = gdctmpcleaner.TmpCleaner(self.config)
+        self._age(os.path.join(self.temp, '1'), 2)
+        self._age(os.path.join(self.temp, '1', '1'), 2)
+        cleaner.run()
+
+        self.assertTrue(os.path.exists(os.path.join(self.temp, '1')))
+        self.assertTrue(os.path.exists(os.path.join(self.temp, '1', '2')))
+        self.assertTrue(os.path.exists(os.path.join(self.temp, '2')))
+
+        self.assertFalse(os.path.exists(os.path.join(self.temp, '1', '1')))
 
 if __name__ == '__main__':
     unittest.main()
