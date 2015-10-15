@@ -167,7 +167,7 @@ class TmpCleaner(object):
                 pass
 
         # This directory should be deleted after it's children are
-        if self.match(root) and deleted_a_kid:
+        if deleted_a_kid and path != self.config['path'] and self.match(root):
             parent, _ = os.path.split(path)
             dirs.append(parent)
         return dirs
@@ -192,7 +192,7 @@ class TmpCleaner(object):
         Matches at least one definition?
 
         :param file: instance of File class
-        :return: True/False
+        :return: matching definition/None
         """
         for definition in self.definitions:
             # Check if file matches definition path (or path is not specified)
@@ -201,10 +201,7 @@ class TmpCleaner(object):
                 # match time)
                 if definition.match_time(file):
                     if definition.no_remove is False:
-                        ftype = 'directory' if file.directory else 'file'
-                        lg.info("Removing %s %s, matching definition %s",
-                                ftype, file.path, definition.name)
-                        return True
+                        return definition
                     else:
                         lg.debug("File %s matches definition %s, but we don't "
                                  "want to remove it", file.path,
@@ -221,7 +218,7 @@ class TmpCleaner(object):
                 if definition.path_match or file.removed:
                     break
 
-        return False
+        return None
 
     def match_delete(self, file):
         """
@@ -230,7 +227,11 @@ class TmpCleaner(object):
         :param file: instance of File class
         """
 
-        if self.match(file):
+        matching_definition = self.match(file)
+        if matching_definition:
+            ftype = 'directory' if file.directory else 'file'
+            lg.info("Removing %s %s, matching definition %s",
+                    ftype, file.path, matching_definition.name)
             if not self.dry:
                 try:
                     file.remove()

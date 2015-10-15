@@ -153,7 +153,7 @@ definitions:
         st = os.stat(path)
         atime = st[stat.ST_ATIME]
         mtime = st[stat.ST_MTIME]
-        new_mtime = mtime - 3600*days
+        new_mtime = mtime - 24*3600*days
         os.utime(path, (atime, new_mtime))
 
     def test_old_dir(self):
@@ -168,5 +168,54 @@ definitions:
 
         self.assertFalse(os.path.exists(os.path.join(self.temp, '1', '1')))
 
+class TestEscapeRoot(unittest.TestCase):
+    def setUp(self):
+        """
+        Prepare testing directory structure
+        """
+
+        config = '''---
+pidfile: 'tmpcleaner-execution-log2.pid'
+path: '%s'
+
+definitions:
+    -
+        name: 'test-def'
+        pathMatch: '.*'
+        mtime: 0
+
+'''
+        self.temp = tempfile.mkdtemp()
+        for i in range(1, 20):
+            os.mkdir('%s/%s' % (self.temp, i))
+            for f in range(1, 5):
+                with open('%s/%s/%s' % (self.temp, i, f), 'w') as fh:
+                    fh.write(str(f))
+
+        self.config = tempfile.mktemp()
+        with open(self.config, 'a') as fh:
+            fh.write(config % self.temp)
+
+    def tearDown(self):
+        """
+        Cleanup testing directory structure
+        """
+        for root, dirs, files in os.walk(self.temp, topdown=False):
+            for f in files:
+                os.unlink(os.path.join(root, f))
+
+            for d in dirs:
+                os.rmdir(os.path.join(root, d))
+
+        os.unlink(self.config)
+
+    def test_escape_root(self):
+        cleaner = gdctmpcleaner.TmpCleaner(self.config)
+        cleaner.run()
+
+        self.assertFalse(os.path.exists(os.path.join(self.temp, '1')))
+        self.assertFalse(os.path.exists(os.path.join(self.temp, '20')))
+
+        self.assertTrue(os.path.exists(self.temp))
 if __name__ == '__main__':
     unittest.main()
