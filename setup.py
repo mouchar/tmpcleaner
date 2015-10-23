@@ -22,7 +22,7 @@ class PyTest(TestCommand):
 # Parameters for build
 params = {
     'name': 'tmpcleaner',
-    'version': '1.0.9',
+    'version': '1.0.10',
     'packages': [
         'gdctmpcleaner',
         'gdctmpcleaner.logger'

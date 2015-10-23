@@ -1,5 +1,5 @@
 Name:		tmpcleaner
-Version:	1.0.9
+Version:	1.0.10
 Release:	1%{?dist}
 Source0:	tmpcleaner.tar.gz
 License:	BSD

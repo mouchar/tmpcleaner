@@ -150,7 +150,7 @@ class TmpCleaner(object):
                     deleted_a_kid = True
                 else:
                     if f_object.directory:
-                        dirs.append(file_path)
+                        dirs.append(f_object)
         except OSError as e:
             # Exceptions that may come from os.listdir()
             if e.errno == errno.ENOENT:
