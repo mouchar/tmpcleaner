@@ -227,6 +227,7 @@ class TmpCleaner(object):
         :param file: instance of File class
         """
 
+        not_deleted = False
         matching_definition = self.match(file)
         if matching_definition:
             ftype = 'directory' if file.directory else 'file'
@@ -239,6 +240,7 @@ class TmpCleaner(object):
                     # Directory not empty or file or directory doesn't exist,
                     # these errors are fine just log them and go on
                     if e.errno in [errno.ENOENT, errno.ENOTEMPTY]:
+                        not_deleted = True
                         lg.info(e)
                     elif e.errno in [errno.EPERM, errno.EACCES]:
                         # Permission denied or operation not supported,
@@ -251,9 +253,10 @@ class TmpCleaner(object):
             else:
                 # Set removed flag manually in dry-run
                 file.removed = True
-
-        if file.removed:
-            self.update_summary(file)
+        # don't count dirs with subdirs
+        if matching_definition and not_deleted:
+            return file
+        self.update_summary(file)
         return file
 
     def update_summary(self, f_object):
