@@ -252,7 +252,8 @@ class TmpCleaner(object):
                 # Set removed flag manually in dry-run
                 file.removed = True
 
-        self.update_summary(file)
+        if file.removed:
+            self.update_summary(file)
         return file
 
     def update_summary(self, f_object):
