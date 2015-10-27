@@ -217,5 +217,98 @@ definitions:
         self.assertFalse(os.path.exists(os.path.join(self.temp, '20')))
 
         self.assertTrue(os.path.exists(self.temp))
+
+class TestStats(unittest.TestCase):
+    def setUp(self):
+        """
+        Prepare testing directory structure
+        """
+
+        config = '''---
+pidfile: 'tmpcleaner-execution-log3.pid'
+path: '%s'
+
+definitions:
+    -
+        name: 'test-def'
+        pathMatch: '%s/.*'
+        mtime: 1
+
+'''
+        self.temp = tempfile.mkdtemp()
+        for i in range(1, 20):
+            os.mkdir('%s/%s' % (self.temp, i))
+            for f in range(1, 5):
+                with open('%s/%s/%s' % (self.temp, i, f), 'w') as fh:
+                    fh.write(str(f))
+        os.mkdir('%s/20' % self.temp)
+
+        self.config = tempfile.mktemp()
+        with open(self.config, 'a') as fh:
+            fh.write(config % (self.temp, self.temp))
+
+    def tearDown(self):
+        """
+        Cleanup testing directory structure
+        """
+        for root, dirs, files in os.walk(self.temp, topdown=False):
+            for f in files:
+                os.unlink(os.path.join(root, f))
+
+            for d in dirs:
+                os.rmdir(os.path.join(root, d))
+
+        os.unlink(self.config)
+
+    def _age(self, path, days):
+        """
+        Change file(dir)'s mtime to past
+        """
+        st = os.stat(path)
+        atime = st[stat.ST_ATIME]
+        mtime = st[stat.ST_MTIME]
+        new_mtime = mtime - 24*3600*days
+        os.utime(path, (atime, new_mtime))
+
+    def _size(self, path, size):
+        with open(path, 'w') as fh:
+            fh.write('\0' * size)
+
+    def test_stats(self):
+        self._size(os.path.join(self.temp, '1', '1'), 1024*1024)
+        self._size(os.path.join(self.temp, '5', '1'), 1024*1024)
+        self._size(os.path.join(self.temp, '6', '1'), 1024*1024)
+        self._size(os.path.join(self.temp, '7', '1'), 1024*1024)
+        self._size(os.path.join(self.temp, '8', '1'), 1024*1024)
+        self._size(os.path.join(self.temp, '9', '1'), 1024*1024)
+
+        self._age(os.path.join(self.temp, '1', '1'), 2)
+        self._age(os.path.join(self.temp, '1', '2'), 2)
+        self._age(os.path.join(self.temp, '1', '3'), 2)
+        self._age(os.path.join(self.temp, '1', '4'), 2)
+        self._age(os.path.join(self.temp, '20'), 2)
+        self._age(os.path.join(self.temp, '2', '1'), 2)
+        self._age(os.path.join(self.temp, '3', '1'), 2)
+
+        cleaner = gdctmpcleaner.TmpCleaner(self.config)
+        cleaner.run()
+
+        self.assertEqual(
+            cleaner.summary['test-def']['removed']['files'], 6)
+        self.assertEqual(
+            cleaner.summary['test-def']['removed']['dirs'], 1)
+        self.assertEqual(
+            cleaner.summary['test-def']['existing']['files'], 70)
+        self.assertEqual(
+            cleaner.summary['test-def']['existing']['dirs'], 19)
+
+        self.assertTrue(
+            (cleaner.summary['test-def']['removed']['size'] - 1024*1024) <
+            abs(1024))
+        self.assertTrue(
+            (cleaner.summary['test-def']['existing']['size'] - 5*1024*1024) <
+            abs(1024))
+
+
 if __name__ == '__main__':
     unittest.main()
