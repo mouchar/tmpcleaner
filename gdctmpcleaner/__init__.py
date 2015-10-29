@@ -126,7 +126,7 @@ class TmpCleaner(object):
                     continue
 
                 try:
-                    f_object = File(file_path)
+                    f_object = File(file_path, seen=root.already_seen)
                 except UnsupportedFileType as e:
                     lg.warn('%s ..skipping' % e)
                     continue
@@ -144,6 +144,10 @@ class TmpCleaner(object):
                         # eg. corrupted file on GlusterFS may raise IOError, but we want to continue
                         lg.exception(e)
                         continue
+
+                # subsequent directory passes won't delete more files
+                if f_object.already_seen and not f_object.directory:
+                    continue
 
                 self.match_delete(f_object)
                 if f_object.removed:
@@ -169,7 +173,12 @@ class TmpCleaner(object):
         # This directory should be deleted after it's children are
         if deleted_a_kid and path != self.config['path'] and self.match(root):
             parent, _ = os.path.split(path)
-            dirs.append(parent)
+            try:
+                parent_object = File(parent, seen=True)
+                dirs.append(parent_object)
+            except OSError as e:
+                lg.exeption(e)
+                dirs.append(parent)
         return dirs
 
     def run(self):
@@ -277,6 +286,10 @@ class TmpCleaner(object):
         else:
             status = 'existing'
 
+        # already counted this dir
+        if f_object.already_seen and not f_object.removed:
+            return
+
         self.summary[f_object.definition][status][category] += 1
 
         # Update size statistics
@@ -296,12 +309,13 @@ class File(object):
     """
     Represents single file or directory
     """
-    def __init__(self, path, fstat=None):
+    def __init__(self, path, fstat=None, seen=False):
         """
         Initialize object, stat file if stat is empty
 
         :param path: full path to a file
         :param fstat: posix.stat_result (output of os.stat())
+        :param seen: not passing the direcotry for the first time
         """
         self.path = path
         self.stat = os.stat(path) if not fstat else fstat
@@ -311,6 +325,7 @@ class File(object):
         self.definition = None
         self.failed = None
         self.removed = False
+        self.already_seen = seen
 
         self.atime = datetime.fromtimestamp(self.stat.st_atime)
         self.mtime = datetime.fromtimestamp(self.stat.st_mtime)
