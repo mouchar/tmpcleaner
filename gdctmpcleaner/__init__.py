@@ -98,13 +98,14 @@ class TmpCleaner(object):
         if self.pidfile:
             os.unlink(self.pidfile)
 
-    def walk_dir(self, path):
+    def walk_tree(self, path, topdown=True):
         """
-        Delete files matching criteria and return list of subdirs
+        Walk directory tree, similar to os.walk() but return File objects
 
         :param path: File object or string path
-        :returns: list of subdirs
-        :rtype: list
+        :param topdown: pass from top down or from bottom to top
+        :returns: 3-tuple like (File(root), [File(dir)], [File(file)])
+        :rtype: tuple
         """
         if isinstance(path, File):
             # Called with File object as an argument
@@ -113,8 +114,7 @@ class TmpCleaner(object):
         else:
             root = File(path)
 
-        dirs = []
-        deleted_a_kid = False
+        files, dirs = [], []
 
         try:
             for item in os.listdir(path):
@@ -145,16 +145,10 @@ class TmpCleaner(object):
                         lg.exception(e)
                         continue
 
-                # subsequent directory passes won't delete more files
-                if f_object.already_seen and not f_object.directory:
-                    continue
-
-                self.match_delete(f_object)
-                if f_object.removed:
-                    deleted_a_kid = True
+                if f_object.directory is True:
+                    dirs.append(f_object)
                 else:
-                    if f_object.directory:
-                        dirs.append(f_object)
+                    files.append(f_object)
         except OSError as e:
             # Exceptions that may come from os.listdir()
             if e.errno == errno.ENOENT:
@@ -170,16 +164,15 @@ class TmpCleaner(object):
                 lg.exception(e)
                 pass
 
-        # This directory should be deleted after it's children are
-        if deleted_a_kid and path != self.config['path'] and self.match(root):
-            parent, _ = os.path.split(path)
-            try:
-                parent_object = File(parent, seen=True)
-                dirs.append(parent_object)
-            except OSError as e:
-                lg.exeption(e)
-                dirs.append(parent)
-        return dirs
+        if topdown:
+            yield root, dirs, files
+
+        for item in dirs:
+            for x in self.walk_tree(item):
+                yield x
+
+        if not topdown:
+            yield root, dirs, files
 
     def run(self):
         """
@@ -189,10 +182,19 @@ class TmpCleaner(object):
         lg.warn("Passing %s" % self.config['path'])
         time_start = datetime.now()
 
-        buffer_dirs = self.walk_dir(self.config['path'])
-        while buffer_dirs:
-            subdir = buffer_dirs.pop(0)
-            buffer_dirs += self.walk_dir(subdir)
+        buffer_dirs = []
+        for root, dirs, files in self.walk_tree(self.config['path'], topdown=True):
+            for f_object in files:
+                # Remove files immediately
+                self.match_delete(f_object)
+
+            for f_object in dirs:
+                # Dirs have to be removed at last
+                buffer_dirs.append(f_object)
+
+        # Remove directories
+        for f_object in buffer_dirs:
+            self.match_delete(f_object)
 
         self.time_run = datetime.now() - time_start
 
