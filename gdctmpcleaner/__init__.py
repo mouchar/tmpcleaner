@@ -16,6 +16,7 @@ from itertools import count
 import yaml
 import re
 from datetime import datetime, timedelta
+import time
 
 import logging
 lg = logging.getLogger('tmpcleaner')
@@ -90,6 +91,24 @@ class TmpCleaner(object):
                     fh.write(str(os.getpid()))
                 atexit.register(self._cleanup)
 
+        # Cache for unprocessed records
+        self.st = {}
+
+    def errh(self, exc):
+        """
+        Error-handling function for os.walk
+        """
+        if exc.errno == errno.ENOENT:
+            # Directory doesn't exist, go on
+            pass
+        elif exc.errno in [errno.EPERM, errno.EACCES]:
+            # Permission denied or operation not permitted, log error and go on
+            lg.error(exc)
+        else:
+            # Other errors should be fatal, but we don't want them to be
+            # eg. corrupted file on GlusterFS may raise IOError, but we want to go on
+            lg.exception(exc)
+
     def _cleanup(self):
         """
         Cleanup actions
@@ -98,81 +117,49 @@ class TmpCleaner(object):
         if self.pidfile:
             os.unlink(self.pidfile)
 
-    def walk_tree(self, path, topdown=True):
+    def walk_tree(self, top):
         """
-        Walk directory tree, similar to os.walk() but return File objects
+        Walk directory tree, uses os.walk()
 
-        :param path: File object or string path
-        :param topdown: pass from top down or from bottom to top
-        :returns: 3-tuple like (File(root), [File(dir)], [File(file)])
-        :rtype: tuple
+        :param top: string path where to start
         """
-        if isinstance(path, File):
-            # Called with File object as an argument
-            root = path
-            path = root.path
-        else:
-            root = File(path)
-
-        files, dirs = [], []
-
-        try:
-            for item in os.listdir(path):
-                file_path = os.path.join(path, item)
-
-                if self.path_ignore and self.path_ignore.match(file_path):
-                    # Skip excluded paths
-                    lg.debug("Ignoring path %s" % file_path)
-                    continue
-
+        for root, dirs, files in os.walk(top, topdown=False, onerror=self.errh):
+            self.st.update({root: {'files': list(files), 'dirs': list(dirs)}})
+            # Handle path_ignore
+            if self.path_ignore and self.path_ignore.match(root):
+                continue
+            for name in files:
+                fname = os.path.join(root, name)
                 try:
-                    f_object = File(file_path, seen=root.already_seen)
-                except UnsupportedFileType as e:
-                    lg.warn('%s ..skipping' % e)
+                    curr = File(fname)
+                except UnsupportedFileType as exc:
+                    lg.warn('%s ..skipping' % exc)
                     continue
-                except OSError as e:
-                    if e.errno == errno.ENOENT:
-                        # File already removed, go on
-                        lg.debug('File already removed: %s' % e)
-                        continue
-                    elif e.errno in [errno.EPERM, errno.EACCES]:
-                        # Permission denied or operation not permitted, log error and go on
-                        lg.error(e)
-                        continue
-                    else:
-                        # Other errors should be fatal, but we don't want them to be
-                        # eg. corrupted file on GlusterFS may raise IOError, but we want to continue
-                        lg.exception(e)
-                        continue
-
-                if f_object.directory is True:
-                    dirs.append(f_object)
+                curr = self.match_delete(curr)
+                if curr.removed:
+                    self.st[root]['files'].remove(name)
+            for name in dirs:
+                fname = os.path.join(root,name)
+                try:
+                    curr = File(fname)
+                except UnsupportedFileType as exc:
+                    lg.warn('%s ..skipping' % exc)
+                    continue
+                if self.st[fname]['files'] or self.st[fname]['dirs']:
+                    # This dir still has some files/dirs, we'll preserve it
+                    for d in self.st[fname]['dirs']:
+                        # but we can remove already processed children to save memory
+                        del self.st[os.path.join(fname, d)]
                 else:
-                    files.append(f_object)
-        except OSError as e:
-            # Exceptions that may come from os.listdir()
-            if e.errno == errno.ENOENT:
-                # Directory doesn't exist, go on
-                pass
-            elif e.errno in [errno.EPERM, errno.EACCES]:
-                # Permission denied or operation not permitted, log error and go on
-                lg.error(e)
-                pass
-            else:
-                # Other errors should be fatal, but we don't want them to be
-                # eg. corrupted file on GlusterFS may raise IOError, but we want to go on
-                lg.exception(e)
-                pass
-
-        if topdown:
-            yield root, dirs, files
-
-        for item in dirs:
-            for x in self.walk_tree(item):
-                yield x
-
-        if not topdown:
-            yield root, dirs, files
+                    curr = self.match_delete(curr)
+                    if curr.removed:
+                        self.st[root]['dirs'].remove(name)
+                        del self.st[fname]
+                    else:
+                        # Preserve not matching directory
+                        for d in self.st[fname]['dirs']:
+                            # but remove it from cache
+                            del self.st[os.path.join(fname, d)]
 
     def run(self):
         """
@@ -182,20 +169,7 @@ class TmpCleaner(object):
         lg.warn("Passing %s" % self.config['path'])
         time_start = datetime.now()
 
-        buffer_dirs = []
-        for root, dirs, files in self.walk_tree(self.config['path'], topdown=True):
-            for f_object in files:
-                # Remove files immediately
-                self.match_delete(f_object)
-
-            for f_object in dirs:
-                # Dirs have to be removed at last
-                buffer_dirs.append(f_object)
-
-        # Remove directories
-        for f_object in buffer_dirs:
-            self.match_delete(f_object)
-
+        self.walk_tree(self.config['path'])
         self.time_run = datetime.now() - time_start
 
     def match(self, file):
@@ -288,10 +262,6 @@ class TmpCleaner(object):
         else:
             status = 'existing'
 
-        # already counted this dir
-        if f_object.already_seen and not f_object.removed:
-            return
-
         self.summary[f_object.definition][status][category] += 1
 
         # Update size statistics
@@ -311,13 +281,12 @@ class File(object):
     """
     Represents single file or directory
     """
-    def __init__(self, path, fstat=None, seen=False):
+    def __init__(self, path, fstat=None):
         """
         Initialize object, stat file if stat is empty
 
         :param path: full path to a file
         :param fstat: posix.stat_result (output of os.stat())
-        :param seen: not passing the direcotry for the first time
         """
         self.path = path
         self.stat = os.stat(path) if not fstat else fstat
@@ -327,11 +296,10 @@ class File(object):
         self.definition = None
         self.failed = None
         self.removed = False
-        self.already_seen = seen
 
-        self.atime = datetime.fromtimestamp(self.stat.st_atime)
-        self.mtime = datetime.fromtimestamp(self.stat.st_mtime)
-        self.ctime = datetime.fromtimestamp(self.stat.st_ctime)
+        self.atime = self.stat.st_atime
+        self.mtime = self.stat.st_mtime
+        self.ctime = self.stat.st_ctime
 
         # Check if it's file or directory, otherwise raise exception
         if not self.directory and not stat.S_ISREG(self.stat.st_mode):
@@ -355,21 +323,20 @@ class Definition(object):
     """
     _ids = count(0)
 
-    def __init__(self, name=None, pathMatch=None, pathExclude=None, filesOnly=False, noRemove=False, mtime=None, atime=None, ctime=None):
+    def __init__(self, name=None, pathMatch=None, pathExclude=None, noRemove=False, mtime=None, atime=None, ctime=None):
         """
         Setup variables
         """
         self.ids = self._ids.next()
         self.name = name if name else self.ids
 
-        self.path_match = re.compile(pathMatch) if pathMatch else pathMatch
-        self.path_exclude = re.compile(pathExclude) if pathExclude else pathExclude
-        self.files_only = filesOnly
+        self.path_match = re.compile(pathMatch) if pathMatch else None
+        self.path_exclude = re.compile(pathExclude) if pathExclude else None
         self.no_remove = noRemove
 
-        self.mtime = mtime
-        self.atime = atime
-        self.ctime = ctime
+        self.mtime = 3600 * mtime if mtime else None
+        self.atime = 3600 * atime if atime else None
+        self.ctime = 3600 * ctime if ctime else None
 
     def match_path(self, file):
         """
@@ -405,21 +372,15 @@ class Definition(object):
         :rtype: bool
         """
         # Check mtime/ctime/atime
-        now = datetime.now()
-        if self.atime:
-            delta = timedelta(hours=self.atime)
-            if (now - delta) < file.atime:
-                return False
+        now = time.time()
+        if self.atime and (now - self.atime) < file.atime:
+            return False
 
-        if self.mtime:
-            delta = timedelta(hours=self.mtime)
-            if (now - delta) < file.mtime:
-                return False
+        if self.mtime and (now - self.mtime) < file.mtime:
+            return False
 
-        if self.ctime:
-            delta = timedelta(hours=self.ctime)
-            if (now - delta) < file.ctime:
-                return False
+        if self.ctime and (now - self.ctime) < file.ctime:
+            return False
 
         # File matches definition - set it in file object for statistical purposes
         if not file.definition:

@@ -42,7 +42,6 @@ Configuration file should be simple YAML file.
 | **name**      | friendly name for classification (otherwise id will be used |
 | **pathMatch** | regular expression for path to match                        |
 | **pathExclude** | regular expression for path to exclude                    |
-| **filesOnly** | ignore directories |
 | **noRemove**  | don't remove files/directories, only gather statistics      |
 | **atime**     | filter by access time (hour)        |
 | **mtime**     | Filter by modification time (hour)  |

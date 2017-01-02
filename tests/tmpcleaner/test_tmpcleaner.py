@@ -5,7 +5,6 @@
 import unittest
 import posix
 import tempfile
-import datetime
 import os
 import stat
 import gdctmpcleaner
@@ -48,10 +47,10 @@ class TestTmpcleaner(unittest.TestCase):
         # Removing of non-empty directory should fail
         self.assertRaises(OSError, file_object.remove)
 
-        # atime/mtime/ctime should be datetime objects
+        # atime/mtime/ctime should be float
         for time in (file_object.atime, file_object.mtime, file_object.ctime):
-            self.assert_(isinstance(time, datetime.datetime),
-                "Returned atime/mtime/ctime should be datetime objects, not %s" % type(time))
+            self.assert_(isinstance(time, float),
+                "Returned atime/mtime/ctime should be float, not %s" % type(time))
 
         # Opening unsupported file type should raise UnsupportedFileType exception
         self.assertRaises(gdctmpcleaner.UnsupportedFileType,
@@ -88,7 +87,7 @@ class TestTmpcleaner(unittest.TestCase):
         definition = gdctmpcleaner.Definition(mtime=5)
         file_temp = gdctmpcleaner.File(self.temp)
         # Modify mtime of tested file
-        file_temp.mtime = datetime.datetime.fromtimestamp(666)
+        file_temp.mtime = 666
 
         # pathMatch is not defined, so it should always pass
         self.assert_(definition.match_path(file_temp),

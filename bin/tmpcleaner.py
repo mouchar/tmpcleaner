@@ -22,7 +22,6 @@ Config options per definition:
     name    - friendly name for classification (otherwise id will be used)
     pathMatch   - regular expression for path to match
     pathExclude - regular expression for path to exclude
-    filesOnly   - ignore directories
     noRemove    - don't remove files/directories, good for statistical classification
     atime       - filter by access time (hour)
     mtime       - filter by modification time (hour)
@@ -77,7 +76,7 @@ def main():
                         help='Be quiet (no console logging)')
     args = parser.parse_args()
 
-    logging_args = {'console': not args.quiet}
+    logging_args = {'console': not args.quiet, 'syslog': args.quiet}
     lg = gdctmpcleaner.logger.init(name='tmpcleaner', **logging_args)
 
     if args.verbose:
